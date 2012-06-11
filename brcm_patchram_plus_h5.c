@@ -18,7 +18,7 @@
 
 /*****************************************************************************
 **                                                                           
-**  Name:          brcm_patchram_plus.c
+**  Name:          brcm_patchram_plus_h5.c
 **
 **  Description:   This program downloads a patchram files in the HCD format
 **                 to Broadcom Bluetooth based silicon and combo chips and
@@ -144,13 +144,12 @@
 #define HCIUARTGETPROTO		_IOR('U', 201, int)
 #define HCIUARTGETDEVICE	_IOR('U', 202, int)
 
-#define HCI_UART_H4	0
+#define HCI_UART_H4		0
 #define HCI_UART_BCSP	1
 #define HCI_UART_3WIRE	2
 #define HCI_UART_H4DS	3
-#define HCI_UART_LL	4
-#define HCI_UART_ATH3K	5
-#define HCI_UART_H5	6
+#define HCI_UART_LL		4
+#define HCI_UART_H5		5
 
 #define CHIP_ID_4330B2 0x43
 #define CHIP_ID_4329B1 0x29
@@ -207,8 +206,7 @@ uchar slip_sync_response[] =
 	{ 0xc0, 0x00, 0x2f, 0x00, 0xd0, 0x02, 0x7d, 0xc0 };
 
 uchar slip_config[] = 
-	// { 0xc0, 0x00, 0x3f, 0x00, 0xdb, 0xdc, 0x03, 0xfc, 0x1b, 0xc0 };
-	{ 0xc0, 0x00, 0x3f, 0x00, 0xdb, 0xdc, 0x03, 0xfc, 0x1f, 0xc0 };
+	{ 0xc0, 0x00, 0x3f, 0x00, 0xdb, 0xdc, 0x03, 0xfc, 0x1b, 0xc0 };
 
 uchar slip_config_response[] = 
 	{ 0xc0, 0x00, 0x3f, 0x00, 0xdb, 0xdc, 0x04, 0x7b, 0x1b, 0xc0 };
@@ -408,8 +406,6 @@ parse_i2s(char *optarg)
 	for (i = 0; i < 4; i++) {
 		hci_write_i2spcm_interface_param[4 + i] = param[i];
 	}
-
-	return(0);
 }
 
 int
@@ -578,9 +574,7 @@ init_uart()
 	termios.c_cflag |= CS8;
 #endif
 
-	
-	termios.c_cflag |= CLOCAL;
-	termios.c_cflag |= CRTSCTS;
+	termios.c_cflag &= ~CRTSCTS;
 	tcsetattr(uart_fd, TCSANOW, &termios);
 	tcflush(uart_fd, TCIOFLUSH);
 	tcsetattr(uart_fd, TCSANOW, &termios);
@@ -613,6 +607,9 @@ read_event(int fd, uchar *buffer)
 	int i = 0;
 	int len = 3;
 	int count;
+
+	i = 0;
+	len = 3;
 
 	while ((count = read(fd, &buffer[i], len)) < len) {
 		if (debug) {
@@ -805,14 +802,10 @@ proc_enable_hci()
 	int i = N_HCI;
 	int proto = (enable_h4 ? HCI_UART_H4 : HCI_UART_H5);
 
-	fprintf(stderr, "set line discipline\n");
-
 	if (ioctl(uart_fd, TIOCSETD, &i) < 0) {
 		fprintf(stderr, "Can't set line discipline\n");
 		return;
 	}
-
-	fprintf(stderr, "set hci protocol\n");
 
 	if (ioctl(uart_fd, HCIUARTSETPROTO, proto) < 0) {
 		fprintf(stderr, "Can't set hci protocol\n");
@@ -873,14 +866,11 @@ read_default_bdaddr()
 }
 #endif
 
-#define MAX_SYNC_RETRIES 2
-
 int
 proc_slip_sync()
 {
 	int count;
 	int ret = 0;
-	int max_sync_retries = 0;
 
 	signal(SIGALRM, slip_expired);
 
@@ -900,17 +890,7 @@ proc_slip_sync()
 			alarm(0);
 			ret = 1;
 		} else { 
-			if (max_sync_retries < MAX_SYNC_RETRIES) { 
-
-				hci_send_cmd(slip_sync_response, sizeof(slip_sync_response));
-				max_sync_retries++;
-			} else {
-				max_sync_retries = 0;
-
-				hci_send_cmd(slip_sync, sizeof(slip_sync));
-
-				alarm(4);
-			}
+			hci_send_cmd(slip_sync_response, sizeof(slip_sync_response));
 		}
 	}
 
@@ -941,11 +921,13 @@ proc_slip_config()
 			if (buffer[5] == 0x03 && buffer[6] == 0xfc) {
 				hci_send_cmd(slip_config_null_response, 
 					sizeof(slip_config_null_response));
-
+			} else {
+				hci_send_cmd(slip_sync_response, sizeof(slip_sync_response));
 			}
 		} else if (buffer[7] == 0x7b) {
 			alarm(0);
 			ret = 1;
+		} else { 
 			hci_send_cmd(slip_config_response, sizeof(slip_config_response));
 		}
 	}
@@ -953,7 +935,7 @@ proc_slip_config()
 	return(ret);
 }
 
-void
+
 slip_read()
 {
 	int count;
@@ -1022,17 +1004,6 @@ main (int argc, char **argv)
 
 		time(&t);
 		fprintf(stderr, "start %s\n", ctime(&t));
-
-#if 0
-		// Turn off RTS/CTS flow control
-		termios.c_cflag &= ~CRTSCTS;
-
-		// turn XON/XOFF back on
-		tcgetattr(uart_fd, &termios);
-		termios.c_iflag |= (IXON | IXOFF);
-		termios.c_lflag |= ICANON;
-		tcsetattr(uart_fd, TCSANOW, &termios);
-#endif
 	
 		while (!proc_slip_sync()) {
 			sleep(4);
@@ -1050,6 +1021,15 @@ main (int argc, char **argv)
 	}
 
 	if (enable_h4 || enable_h5) {
+
+		if (enable_h5) {
+			// turn XON/XOFF back on
+			tcgetattr(uart_fd, &termios);
+			termios.c_iflag |= (IXON | IXOFF);
+			termios.c_lflag |= ICANON;
+			tcsetattr(uart_fd, TCSANOW, &termios);
+		}
+
 		proc_enable_hci();
 
 		while (1) {
