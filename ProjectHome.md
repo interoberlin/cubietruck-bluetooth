@@ -1,0 +1,1 @@
+Utility's to configure and test Broadcom Bluetooth chips on Linux
