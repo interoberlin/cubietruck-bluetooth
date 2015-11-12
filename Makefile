@@ -44,4 +44,5 @@ test:
 	hciconfig -a
 	hcitool dev
 	hcitool scan
+	hcitool lescan
 
