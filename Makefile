@@ -17,9 +17,7 @@
 #******************************************************************************
 
 LDLIBS = -lbluetooth
-# CFLAGS=-g
-
-CFLAGS=
+CFLAGS=-g
 
 all : brcm_patchram_plus brcm_patchram_plus_h5 brcm_patchram_plus_usb
 
@@ -28,4 +26,22 @@ brcm_patchram_plus_h5 : brcm_patchram_plus_h5.o
 brcm_patchram_plus : brcm_patchram_plus.o
 
 brcm_patchram_plus_usb : brcm_patchram_plus_usb.o
+
+dependencies:
+	apt-get update
+	apt-get install bluez libbluetooth3 libbluetooth-dev -y
+
+modprobe:
+	for module in rfcomm bnep hci_uart bluetooth hidp; do modprobe $$module; done
+
+load: modprobe
+	echo -n "" > /dev/ttyS1
+	sleep 1
+	./brcm_patchram_plus -d --patchram /lib/firmware/ap6210/bcm20710a1.hcd --enable_hci --bd_addr 11:22:33:44:55:66 --no2bytes --tosleep 1000 /dev/ttyS1
+	hciattach /dev/ttyS1 any
+
+test:
+	hciconfig -a
+	hcitool dev
+	hcitool scan
 
