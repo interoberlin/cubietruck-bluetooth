@@ -1,0 +1,8 @@
+*.o
+
+.*.swp
+*~
+
+brcm_patchram_plus
+brcm_patchram_plus_h5
+brcm_patchram_plus_usb
