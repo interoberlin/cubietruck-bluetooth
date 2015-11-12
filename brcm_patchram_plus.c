@@ -844,10 +844,6 @@ main (int argc, char **argv)
 
 	if (enable_hci) {
 		proc_enable_hci();
-
-		while (1) {
-			sleep(UINT_MAX);
-		}
 	}
 
 	exit(0);
